@@ -6,6 +6,28 @@
 
 <h1>Incidencias abiertas</h1>
 
+<form method="get" asp-controller="Operaciones" asp-action="Incidencias"
+      class="mb-4">
+
+    <div class="input-group">
+        <input type="text"
+               name="busqueda"
+               value="@ViewBag.Busqueda"
+               class="form-control"
+               placeholder="Buscar por estacion o descripcion..." />
+
+        <button type="submit" class="btn btn-primary">
+            Buscar
+        </button>
+
+        <a asp-controller="Operaciones"
+           asp-action="Incidencias"
+           class="btn btn-secondary">
+            Limpiar
+        </a>
+    </div>
+</form>
+
 <table class="table">
     <thead>
         <tr>
@@ -13,7 +35,6 @@
             <th>Descripcion</th>
             <th>Prioridad</th>
             <th>Estado</th>
-            <th>Accion</th>
         </tr>
     </thead>
 
@@ -25,22 +46,14 @@
                 <td>@incidencia.Descripcion</td>
                 <td>@incidencia.Prioridad</td>
                 <td>@incidencia.Estado</td>
-                <td>
-                    <form asp-controller="Operaciones"
-                          asp-action="Cerrar"
-                          method="post">
-
-                        <input type="hidden"
-                               name="id"
-                               value="@incidencia.Id" />
-
-                        <button type="submit"
-                                class="btn btn-danger">
-                            Cerrar
-                        </button>
-                    </form>
-                </td>
             </tr>
         }
     </tbody>
 </table>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-warning">
+        No se encontraron incidencias.
+    </div>
+}

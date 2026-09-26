@@ -1,21 +1,22 @@
-using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace PlataformaIncidencias.Models
 {
     public class Incidencia
     {
+        [JsonPropertyName("Id")]
         public int Id { get; set; }
 
-        [Required]
-        public string Estacion { get; set; } = string.Empty;
+        [JsonPropertyName("Estacion")]
+        public string Estacion { get; set; } = "";
 
-        [Required]
-        public string Descripcion { get; set; } = string.Empty;
+        [JsonPropertyName("Descripcion")]
+        public string Descripcion { get; set; } = "";
 
-        [Required]
-        public string Prioridad { get; set; } = "Media";
+        [JsonPropertyName("Prioridad")]
+        public string Prioridad { get; set; } = "";
 
-        [Required]
-        public string Estado { get; set; } = "Abierta";
+        [JsonPropertyName("Estado")]
+        public string Estado { get; set; } = "";
     }
 }

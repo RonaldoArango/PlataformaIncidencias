@@ -1,0 +1,26 @@
+[
+  {
+    "objectID": "1",
+    "Id": 1,
+    "Estacion": "Estacion Central",
+    "Descripcion": "Bicicleta con freno averiado",
+    "Prioridad": "Alta",
+    "Estado": "Abierta"
+  },
+  {
+    "objectID": "2",
+    "Id": 2,
+    "Estacion": "Estacion Norte",
+    "Descripcion": "Anclaje no libera bicicleta",
+    "Prioridad": "Media",
+    "Estado": "Abierta"
+  },
+  {
+    "objectID": "3",
+    "Id": 3,
+    "Estacion": "Estacion Sur",
+    "Descripcion": "Pantalla de estacion apagada",
+    "Prioridad": "Baja",
+    "Estado": "Abierta"
+  }
+]
