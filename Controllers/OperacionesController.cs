@@ -30,6 +30,8 @@ namespace PlataformaIncidencias.Controllers
 
             var incidencias = await consulta.ToListAsync();
 
+            ViewBag.Criticas = incidencias.Count(x => x.Prioridad == "Alta");
+
             return View(incidencias);
         }
 
