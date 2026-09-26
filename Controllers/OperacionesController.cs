@@ -15,11 +15,20 @@ namespace PlataformaIncidencias.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Incidencias()
+        public async Task<IActionResult> Incidencias(string? prioridad)
         {
-            var incidencias = await _context.Incidencias
+            var consulta = _context.Incidencias
                 .Where(x => x.Estado == "Abierta")
-                .ToListAsync();
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(prioridad))
+            {
+                consulta = consulta.Where(x => x.Prioridad == prioridad);
+            }
+
+            ViewBag.Prioridad = prioridad;
+
+            var incidencias = await consulta.ToListAsync();
 
             return View(incidencias);
         }
