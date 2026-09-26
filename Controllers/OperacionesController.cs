@@ -30,7 +30,9 @@ namespace PlataformaIncidencias.Controllers
 
             var incidencias = await consulta.ToListAsync();
 
-            ViewBag.Criticas = incidencias.Count(x => x.Prioridad == "Alta");
+            ViewBag.Criticas = await _context.Incidencias
+                .CountAsync(x => x.Estado == "Abierta" &&
+                                 x.Prioridad == "Alta");
 
             return View(incidencias);
         }
@@ -41,11 +43,15 @@ namespace PlataformaIncidencias.Controllers
         {
             var incidencia = await _context.Incidencias.FindAsync(id);
 
-            if (incidencia != null)
-            {
-                incidencia.Estado = "Cerrada";
-                await _context.SaveChangesAsync();
-            }
+            if (incidencia == null)
+                return NotFound();
+
+            incidencia.Estado = "Cerrada";
+
+            await _context.SaveChangesAsync();
+
+            TempData["Mensaje"] =
+                "La incidencia fue cerrada correctamente.";
 
             return RedirectToAction(nameof(Incidencias));
         }

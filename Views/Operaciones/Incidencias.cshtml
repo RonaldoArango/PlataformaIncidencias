@@ -6,28 +6,43 @@
 
 <h1>Incidencias abiertas</h1>
 
+@if (TempData["Mensaje"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["Mensaje"]
+    </div>
+}
+
 <div class="alert alert-danger">
     <strong>Incidencias criticas:</strong> @ViewBag.Criticas
 </div>
 
 <form method="get" asp-action="Incidencias" class="mb-3">
+
     <label class="form-label">
         <strong>Filtrar por prioridad:</strong>
     </label>
 
-    <select name="prioridad" class="form-select" style="width:250px;">
+    <select name="prioridad"
+            class="form-select"
+            style="width:250px;">
+
         <option value="">Todas</option>
         <option value="Alta">Alta</option>
         <option value="Media">Media</option>
         <option value="Baja">Baja</option>
+
     </select>
 
-    <button type="submit" class="btn btn-primary mt-2">
+    <button type="submit"
+            class="btn btn-primary mt-2">
         Filtrar
     </button>
+
 </form>
 
 <table class="table">
+
     <thead>
         <tr>
             <th>Estacion</th>
@@ -39,26 +54,35 @@
     </thead>
 
     <tbody>
+
         @foreach (var incidencia in Model)
         {
             <tr>
+
                 <td>@incidencia.Estacion</td>
                 <td>@incidencia.Descripcion</td>
                 <td>@incidencia.Prioridad</td>
                 <td>@incidencia.Estado</td>
+
                 <td>
                     <form asp-controller="Operaciones"
                           asp-action="Cerrar"
                           method="post">
 
-                        <input type="hidden" name="id" value="@incidencia.Id" />
+                        <input type="hidden"
+                               name="id"
+                               value="@incidencia.Id" />
 
-                        <button type="submit" class="btn btn-danger">
-                            Cerrar
+                        <button type="submit"
+                                class="btn btn-danger">
+                            Cerrar incidencia
                         </button>
+
                     </form>
                 </td>
+
             </tr>
         }
+
     </tbody>
 </table>
