@@ -4,7 +4,7 @@
     ViewData["Title"] = "Incidencias";
 }
 
-<h1>Incidencias abiertas</h1>
+<h1>Incidencias abiertas encontradas</h1>
 
 @if (TempData["Mensaje"] != null)
 {
@@ -17,27 +17,57 @@
     <strong>Incidencias criticas:</strong> @ViewBag.Criticas
 </div>
 
-<form method="get" asp-action="Incidencias" class="mb-3">
+<form method="get"
+      asp-controller="Operaciones"
+      asp-action="Incidencias"
+      class="mb-4">
 
-    <label class="form-label">
-        <strong>Filtrar por prioridad:</strong>
-    </label>
+    <div class="mb-3">
+        <label class="form-label">
+            <strong>Buscar incidencia:</strong>
+        </label>
 
-    <select name="prioridad"
-            class="form-select"
-            style="width:250px;">
+        <div class="input-group">
+            <input type="text"
+                   name="busqueda"
+                   value="@ViewBag.Busqueda"
+                   class="form-control"
+                   placeholder="Buscar por estacion o descripcion..." />
 
-        <option value="">Todas</option>
-        <option value="Alta">Alta</option>
-        <option value="Media">Media</option>
-        <option value="Baja">Baja</option>
+            <button type="submit"
+                    class="btn btn-primary">
+                Buscar
+            </button>
 
-    </select>
+            <a asp-controller="Operaciones"
+               asp-action="Incidencias"
+               class="btn btn-secondary">
+                Limpiar
+            </a>
+        </div>
+    </div>
 
-    <button type="submit"
-            class="btn btn-primary mt-2">
-        Filtrar
-    </button>
+    <div>
+        <label class="form-label">
+            <strong>Filtrar por prioridad:</strong>
+        </label>
+
+        <select name="prioridad"
+                class="form-select"
+                style="width:250px;">
+
+            <option value="">Todas</option>
+            <option value="Alta">Alta</option>
+            <option value="Media">Media</option>
+            <option value="Baja">Baja</option>
+
+        </select>
+
+        <button type="submit"
+                class="btn btn-primary mt-2">
+            Filtrar
+        </button>
+    </div>
 
 </form>
 
@@ -58,7 +88,6 @@
         @foreach (var incidencia in Model)
         {
             <tr>
-
                 <td>@incidencia.Estacion</td>
                 <td>@incidencia.Descripcion</td>
                 <td>@incidencia.Prioridad</td>
@@ -80,9 +109,15 @@
 
                     </form>
                 </td>
-
             </tr>
         }
 
     </tbody>
 </table>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-warning">
+        No se encontraron incidencias.
+    </div>
+}
