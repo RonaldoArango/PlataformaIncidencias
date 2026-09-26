@@ -17,6 +17,10 @@
     <strong>Incidencias criticas:</strong> @ViewBag.Criticas
 </div>
 
+<div id="estadoWebSocket" class="alert alert-secondary">
+    Conectando con PieSocket...
+</div>
+
 <form method="get"
       asp-controller="Operaciones"
       asp-action="Incidencias"
@@ -34,8 +38,7 @@
                    class="form-control"
                    placeholder="Buscar por estacion o descripcion..." />
 
-            <button type="submit"
-                    class="btn btn-primary">
+            <button type="submit" class="btn btn-primary">
                 Buscar
             </button>
 
@@ -60,7 +63,6 @@
             <option value="Alta">Alta</option>
             <option value="Media">Media</option>
             <option value="Baja">Baja</option>
-
         </select>
 
         <button type="submit"
@@ -68,11 +70,9 @@
             Filtrar
         </button>
     </div>
-
 </form>
 
 <table class="table">
-
     <thead>
         <tr>
             <th>Estacion</th>
@@ -84,10 +84,9 @@
     </thead>
 
     <tbody>
-
         @foreach (var incidencia in Model)
         {
-            <tr>
+            <tr id="incidencia-@incidencia.Id">
                 <td>@incidencia.Estacion</td>
                 <td>@incidencia.Descripcion</td>
                 <td>@incidencia.Prioridad</td>
@@ -106,12 +105,10 @@
                                 class="btn btn-danger">
                             Cerrar incidencia
                         </button>
-
                     </form>
                 </td>
             </tr>
         }
-
     </tbody>
 </table>
 
@@ -121,3 +118,68 @@
         No se encontraron incidencias.
     </div>
 }
+
+<script>
+    const urlPieSocket = "wss://free.blr2.piesocket.com/v3/1?api_key=vFD4gReEsOthQgikWfe1zOV3Rn0HN3490lkrqlPe&notify_self=1";
+
+    let socket;
+
+    function conectarPieSocket() {
+
+        socket = new WebSocket(urlPieSocket);
+
+        socket.onopen = function () {
+            console.log("WebSocket conectado");
+
+            document.getElementById("estadoWebSocket").innerHTML =
+                "PieSocket conectado - actualizaciones en tiempo real";
+        };
+
+        socket.onmessage = function (event) {
+
+            console.log("Mensaje recibido:", event.data);
+
+            try {
+                const mensaje = JSON.parse(event.data);
+
+                if (mensaje.event === "IncidenciaActualizada") {
+
+                    const datos =
+                        typeof mensaje.data === "string"
+                            ? JSON.parse(mensaje.data)
+                            : mensaje.data;
+
+                    console.log("Incidencia actualizada:", datos);
+
+                    const fila =
+                        document.getElementById("incidencia-" + datos.Id);
+
+                    if (fila && datos.Estado === "Cerrada") {
+                        fila.remove();
+                    }
+                }
+            }
+            catch (error) {
+                console.log("Mensaje WebSocket:", event.data);
+            }
+        };
+
+        socket.onclose = function () {
+
+            document.getElementById("estadoWebSocket").innerHTML =
+                "Conexion perdida. Reconectando...";
+
+            console.log("Reconectando PieSocket...");
+
+            setTimeout(function () {
+                conectarPieSocket();
+            }, 3000);
+        };
+
+        socket.onerror = function (error) {
+            console.log("Error WebSocket:", error);
+        };
+    }
+
+    conectarPieSocket();
+</script>

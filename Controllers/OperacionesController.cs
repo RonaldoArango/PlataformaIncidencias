@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PlataformaIncidencias.Data;
 using PlataformaIncidencias.Models;
+using System.Net.Http.Json;
 
 namespace PlataformaIncidencias.Controllers
 {
@@ -30,10 +31,10 @@ namespace PlataformaIncidencias.Controllers
                 .Where(x => x.Estado == "Abierta")
                 .AsQueryable();
 
-            // Filtro por prioridad
             if (!string.IsNullOrEmpty(prioridad))
             {
-                consulta = consulta.Where(x => x.Prioridad == prioridad);
+                consulta = consulta
+                    .Where(x => x.Prioridad == prioridad);
             }
 
             var incidencias = await consulta.ToListAsync();
@@ -41,11 +42,17 @@ namespace PlataformaIncidencias.Controllers
             // Busqueda mediante Algolia
             if (!string.IsNullOrWhiteSpace(busqueda))
             {
-                var applicationId = _configuration["Algolia:ApplicationId"];
-                var apiKey = _configuration["Algolia:ApiKey"];
-                var indexName = _configuration["Algolia:IndexName"];
+                var applicationId =
+                    _configuration["Algolia:ApplicationId"];
 
-                var client = new SearchClient(applicationId!, apiKey!);
+                var apiKey =
+                    _configuration["Algolia:ApiKey"];
+
+                var indexName =
+                    _configuration["Algolia:IndexName"];
+
+                var client =
+                    new SearchClient(applicationId!, apiKey!);
 
                 var searchParams = new SearchParams(
                     new SearchParamsObject
@@ -64,7 +71,8 @@ namespace PlataformaIncidencias.Controllers
                     .Select(x => x.Id)
                     .ToList();
 
-                // Conserva solo incidencias que siguen abiertas en SQLite
+                // Solo conserva incidencias que siguen abiertas
+                // en la base de datos.
                 incidencias = incidencias
                     .Where(x => idsAlgolia.Contains(x.Id))
                     .ToList();
@@ -73,7 +81,6 @@ namespace PlataformaIncidencias.Controllers
             ViewBag.Prioridad = prioridad;
             ViewBag.Busqueda = busqueda;
 
-            // Indicador de incidencias criticas
             ViewBag.Criticas = await _context.Incidencias
                 .CountAsync(x =>
                     x.Estado == "Abierta" &&
@@ -86,14 +93,63 @@ namespace PlataformaIncidencias.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Cerrar(int id)
         {
-            var incidencia = await _context.Incidencias.FindAsync(id);
+            var incidencia =
+                await _context.Incidencias.FindAsync(id);
 
             if (incidencia == null)
                 return NotFound();
 
+            // 1. Primero guardar el cambio en la base
             incidencia.Estado = "Cerrada";
 
             await _context.SaveChangesAsync();
+
+            // 2. Luego publicar el evento en PieSocket
+            try
+            {
+                var clusterId =
+                    _configuration["PieSocket:ClusterId"];
+
+                var apiKey =
+                    _configuration["PieSocket:ApiKey"];
+
+                var apiSecret =
+                    _configuration["PieSocket:ApiSecret"];
+
+                using var httpClient = new HttpClient();
+
+                var url =
+                    $"https://{clusterId}.piesocket.com/api/publish";
+
+                var datos = new
+                {
+                    key = apiKey,
+                    secret = apiSecret,
+                    channelId = "incidencias",
+
+                    message = new
+                    {
+                        eventName = "IncidenciaActualizada",
+
+                        data = new
+                        {
+                            Id = incidencia.Id,
+                            Estado = incidencia.Estado
+                        }
+                    }
+                };
+
+                var respuesta =
+                    await httpClient.PostAsJsonAsync(url, datos);
+
+                Console.WriteLine(
+                    $"PieSocket: {respuesta.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Error PieSocket: {ex.Message}");
+            }
 
             TempData["Mensaje"] =
                 "La incidencia fue cerrada correctamente.";
