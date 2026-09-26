@@ -21,6 +21,8 @@ namespace PlataformaIncidencias.Controllers
                 .Where(x => x.Estado == "Abierta")
                 .ToListAsync();
 
+            ViewBag.Criticas = incidencias.Count(x => x.Prioridad == "Alta");
+
             return View(incidencias);
         }
 
