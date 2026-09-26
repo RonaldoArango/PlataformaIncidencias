@@ -46,9 +46,11 @@ app.MapRazorPages();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
     db.Database.EnsureCreated();
 
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var userManager =
+        scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
 
     const string email = "supervisor@incidencias.com";
     const string password = "Supervisor123";
@@ -95,6 +97,8 @@ using (var scope = app.Services.CreateScope())
 
         await db.SaveChangesAsync();
     }
+
+
 }
 
 app.Run();
