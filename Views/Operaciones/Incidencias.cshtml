@@ -4,7 +4,7 @@
     ViewData["Title"] = "Incidencias";
 }
 
-<h1>Incidencias abiertas encontradas</h1>
+<h1>Incidencias abiertas en tiempo real</h1>
 
 @if (TempData["Mensaje"] != null)
 {
@@ -38,7 +38,8 @@
                    class="form-control"
                    placeholder="Buscar por estacion o descripcion..." />
 
-            <button type="submit" class="btn btn-primary">
+            <button type="submit"
+                    class="btn btn-primary">
                 Buscar
             </button>
 
@@ -63,6 +64,7 @@
             <option value="Alta">Alta</option>
             <option value="Media">Media</option>
             <option value="Baja">Baja</option>
+
         </select>
 
         <button type="submit"
@@ -70,6 +72,7 @@
             Filtrar
         </button>
     </div>
+
 </form>
 
 <table class="table">
@@ -83,10 +86,12 @@
         </tr>
     </thead>
 
-    <tbody>
+    <tbody id="tablaIncidencias">
+
         @foreach (var incidencia in Model)
         {
             <tr id="incidencia-@incidencia.Id">
+
                 <td>@incidencia.Estacion</td>
                 <td>@incidencia.Descripcion</td>
                 <td>@incidencia.Prioridad</td>
@@ -105,10 +110,13 @@
                                 class="btn btn-danger">
                             Cerrar incidencia
                         </button>
+
                     </form>
                 </td>
+
             </tr>
         }
+
     </tbody>
 </table>
 
@@ -120,64 +128,145 @@
 }
 
 <script>
-    const urlPieSocket = "wss://free.blr2.piesocket.com/v3/1?api_key=vFD4gReEsOthQgikWfe1zOV3Rn0HN3490lkrqlPe&notify_self=1";
+    const urlPieSocket =
+        "wss://free.blr2.piesocket.com/v3/1?api_key=vFD4gReEsOthQgikWfe1zOV3Rn0HN3490lkrqlPe&notify_self=1";
 
     let socket;
+    let primeraConexion = true;
 
     function conectarPieSocket() {
+
+        console.log("Intentando conectar con PieSocket...");
 
         socket = new WebSocket(urlPieSocket);
 
         socket.onopen = function () {
-            console.log("WebSocket conectado");
 
-            document.getElementById("estadoWebSocket").innerHTML =
+            console.log("PieSocket conectado");
+
+            const estado =
+                document.getElementById("estadoWebSocket");
+
+            estado.className = "alert alert-success";
+
+            estado.innerHTML =
                 "PieSocket conectado - actualizaciones en tiempo real";
+
+            // Si la conexion se perdio y posteriormente regreso,
+            // consultamos nuevamente el estado vigente al servidor.
+            if (!primeraConexion) {
+
+                console.log(
+                    "Conexion recuperada. Sincronizando estado..."
+                );
+
+                window.location.reload();
+                return;
+            }
+
+            primeraConexion = false;
         };
 
         socket.onmessage = function (event) {
 
-            console.log("Mensaje recibido:", event.data);
+            console.log(
+                "Mensaje recibido desde PieSocket:",
+                event.data
+            );
 
             try {
+
                 const mensaje = JSON.parse(event.data);
 
-                if (mensaje.event === "IncidenciaActualizada") {
+                let nombreEvento =
+                    mensaje.event ??
+                    mensaje.eventName ??
+                    mensaje.message?.eventName;
 
-                    const datos =
-                        typeof mensaje.data === "string"
-                            ? JSON.parse(mensaje.data)
-                            : mensaje.data;
+                let datos =
+                    mensaje.data ??
+                    mensaje.message?.data;
 
-                    console.log("Incidencia actualizada:", datos);
+                if (typeof datos === "string") {
+
+                    try {
+                        datos = JSON.parse(datos);
+                    }
+                    catch {
+                        // Se conserva el valor original
+                    }
+                }
+
+                if (nombreEvento === "IncidenciaActualizada") {
+
+                    console.log(
+                        "IncidenciaActualizada recibida:",
+                        datos
+                    );
+
+                    if (datos == null)
+                        return;
+
+                    const id =
+                        datos.Id ?? datos.id;
+
+                    const estado =
+                        datos.Estado ?? datos.estado;
 
                     const fila =
-                        document.getElementById("incidencia-" + datos.Id);
+                        document.getElementById(
+                            "incidencia-" + id
+                        );
 
-                    if (fila && datos.Estado === "Cerrada") {
+                    if (fila && estado === "Cerrada") {
+
                         fila.remove();
+
+                        console.log(
+                            "Incidencia eliminada de la tabla:",
+                            id
+                        );
                     }
                 }
             }
             catch (error) {
-                console.log("Mensaje WebSocket:", event.data);
+
+                console.log(
+                    "Mensaje WebSocket no procesado:",
+                    event.data
+                );
+
+                console.log(error);
             }
         };
 
         socket.onclose = function () {
 
-            document.getElementById("estadoWebSocket").innerHTML =
+            console.log(
+                "Conexion PieSocket cerrada. Reconectando..."
+            );
+
+            const estado =
+                document.getElementById("estadoWebSocket");
+
+            estado.className = "alert alert-warning";
+
+            estado.innerHTML =
                 "Conexion perdida. Reconectando...";
 
-            console.log("Reconectando PieSocket...");
-
             setTimeout(function () {
+
                 conectarPieSocket();
+
             }, 3000);
         };
 
         socket.onerror = function (error) {
-            console.log("Error WebSocket:", error);
+
+            console.log(
+                "Error de PieSocket:",
+                error
+            );
         };
     }
 

@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PlataformaIncidencias.Data;
 using PlataformaIncidencias.Models;
+using StackExchange.Redis;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace PlataformaIncidencias.Controllers
 {
@@ -14,6 +16,8 @@ namespace PlataformaIncidencias.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
+
+        private const string CACHE_KEY = "incidencias-abiertas";
 
         public OperacionesController(
             ApplicationDbContext context,
@@ -27,21 +31,15 @@ namespace PlataformaIncidencias.Controllers
             string? prioridad,
             string? busqueda)
         {
-            var consulta = _context.Incidencias
-                .Where(x => x.Estado == "Abierta")
-                .AsQueryable();
+            List<Incidencia> incidencias;
 
-            if (!string.IsNullOrEmpty(prioridad))
-            {
-                consulta = consulta
-                    .Where(x => x.Prioridad == prioridad);
-            }
-
-            var incidencias = await consulta.ToListAsync();
-
-            // Busqueda mediante Algolia
+            // =====================================================
+            // BUSQUEDA: ALGOLIA DIRECTAMENTE, SIN CACHE REDIS
+            // =====================================================
             if (!string.IsNullOrWhiteSpace(busqueda))
             {
+                Console.WriteLine("ALGOLIA: busqueda directa sin Redis");
+
                 var applicationId =
                     _configuration["Algolia:ApplicationId"];
 
@@ -58,33 +56,112 @@ namespace PlataformaIncidencias.Controllers
                     new SearchParamsObject
                     {
                         Query = busqueda
-                    }
-                );
+                    });
 
                 var respuesta =
                     await client.SearchSingleIndexAsync<Incidencia>(
                         indexName!,
-                        searchParams
-                    );
+                        searchParams);
 
                 var idsAlgolia = respuesta.Hits
                     .Select(x => x.Id)
                     .ToList();
 
-                // Solo conserva incidencias que siguen abiertas
-                // en la base de datos.
+                // SQLite confirma cuáles continúan abiertas
+                incidencias = await _context.Incidencias
+                    .Where(x =>
+                        x.Estado == "Abierta" &&
+                        idsAlgolia.Contains(x.Id))
+                    .ToListAsync();
+            }
+            else
+            {
+                // =================================================
+                // LISTADO GENERAL: REDIS -> SQLITE
+                // =================================================
+
+                incidencias = new List<Incidencia>();
+
+                try
+                {
+                    var redisConnection =
+                        _configuration["Redis:ConnectionString"];
+
+                    var redis =
+                        await ConnectionMultiplexer.ConnectAsync(
+                            redisConnection!);
+
+                    var database = redis.GetDatabase();
+
+                    var cache =
+                        await database.StringGetAsync(CACHE_KEY);
+
+                    if (cache.HasValue)
+                    {
+                        Console.WriteLine(
+                            "REDIS HIT: listado obtenido desde Redis");
+
+                        incidencias =
+                            JsonSerializer.Deserialize<List<Incidencia>>(
+                                cache.ToString()) ??
+                            new List<Incidencia>();
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            "REDIS MISS: consultando SQLite");
+
+                        incidencias =
+                            await _context.Incidencias
+                                .Where(x => x.Estado == "Abierta")
+                                .ToListAsync();
+
+                        var json =
+                            JsonSerializer.Serialize(incidencias);
+
+                        await database.StringSetAsync(
+                            CACHE_KEY,
+                            json,
+                            TimeSpan.FromSeconds(60));
+
+                        Console.WriteLine(
+                            "REDIS: cache guardada por 60 segundos");
+                    }
+
+                    await redis.CloseAsync();
+                }
+                catch (Exception ex)
+                {
+                    // Si Redis falla, la aplicación continúa funcionando.
+                    Console.WriteLine(
+                        $"REDIS ERROR: {ex.Message}");
+
+                    Console.WriteLine(
+                        "BASE DE DATOS: usando SQLite");
+
+                    incidencias =
+                        await _context.Incidencias
+                            .Where(x => x.Estado == "Abierta")
+                            .ToListAsync();
+                }
+            }
+
+            // Filtro de prioridad sobre el resultado
+            if (!string.IsNullOrEmpty(prioridad))
+            {
                 incidencias = incidencias
-                    .Where(x => idsAlgolia.Contains(x.Id))
+                    .Where(x => x.Prioridad == prioridad)
                     .ToList();
             }
 
             ViewBag.Prioridad = prioridad;
             ViewBag.Busqueda = busqueda;
 
-            ViewBag.Criticas = await _context.Incidencias
-                .CountAsync(x =>
-                    x.Estado == "Abierta" &&
-                    x.Prioridad == "Alta");
+            ViewBag.Criticas =
+                await _context.Incidencias.CountAsync(
+                    x =>
+                        x.Estado == "Abierta" &&
+                        x.Prioridad == "Alta");
 
             return View(incidencias);
         }
@@ -99,12 +176,40 @@ namespace PlataformaIncidencias.Controllers
             if (incidencia == null)
                 return NotFound();
 
-            // 1. Primero guardar el cambio en la base
+            // 1. GUARDAR PRIMERO EN SQLITE
             incidencia.Estado = "Cerrada";
 
             await _context.SaveChangesAsync();
 
-            // 2. Luego publicar el evento en PieSocket
+            Console.WriteLine(
+                $"BD: incidencia {incidencia.Id} cerrada");
+
+            // 2. INVALIDAR REDIS
+            try
+            {
+                var redisConnection =
+                    _configuration["Redis:ConnectionString"];
+
+                var redis =
+                    await ConnectionMultiplexer.ConnectAsync(
+                        redisConnection!);
+
+                var database = redis.GetDatabase();
+
+                await database.KeyDeleteAsync(CACHE_KEY);
+
+                Console.WriteLine(
+                    "REDIS: cache invalidada");
+
+                await redis.CloseAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"REDIS ERROR al invalidar: {ex.Message}");
+            }
+
+            // 3. PUBLICAR EN PIEHOST
             try
             {
                 var clusterId =
@@ -143,12 +248,12 @@ namespace PlataformaIncidencias.Controllers
                     await httpClient.PostAsJsonAsync(url, datos);
 
                 Console.WriteLine(
-                    $"PieSocket: {respuesta.StatusCode}");
+                    $"PIESOCKET: {respuesta.StatusCode}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine(
-                    $"Error PieSocket: {ex.Message}");
+                    $"PIESOCKET ERROR: {ex.Message}");
             }
 
             TempData["Mensaje"] =
