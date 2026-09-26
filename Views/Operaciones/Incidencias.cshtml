@@ -1,0 +1,46 @@
+@model IEnumerable<PlataformaIncidencias.Models.Incidencia>
+
+@{
+    ViewData["Title"] = "Incidencias";
+}
+
+<h1>Incidencias abiertas</h1>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Estacion</th>
+            <th>Descripcion</th>
+            <th>Prioridad</th>
+            <th>Estado</th>
+            <th>Accion</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        @foreach (var incidencia in Model)
+        {
+            <tr>
+                <td>@incidencia.Estacion</td>
+                <td>@incidencia.Descripcion</td>
+                <td>@incidencia.Prioridad</td>
+                <td>@incidencia.Estado</td>
+                <td>
+                    <form asp-controller="Operaciones"
+                          asp-action="Cerrar"
+                          method="post">
+
+                        <input type="hidden"
+                               name="id"
+                               value="@incidencia.Id" />
+
+                        <button type="submit"
+                                class="btn btn-danger">
+                            Cerrar
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
