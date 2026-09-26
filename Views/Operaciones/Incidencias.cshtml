@@ -6,6 +6,13 @@
 
 <h1>Incidencias abiertas</h1>
 
+@if (TempData["Mensaje"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["Mensaje"]
+    </div>
+}
+
 <table class="table">
     <thead>
         <tr>
@@ -36,7 +43,7 @@
 
                         <button type="submit"
                                 class="btn btn-danger">
-                            Cerrar
+                            Cerrar incidencia
                         </button>
                     </form>
                 </td>

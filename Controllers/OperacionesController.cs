@@ -30,11 +30,14 @@ namespace PlataformaIncidencias.Controllers
         {
             var incidencia = await _context.Incidencias.FindAsync(id);
 
-            if (incidencia != null)
-            {
-                incidencia.Estado = "Cerrada";
-                await _context.SaveChangesAsync();
-            }
+            if (incidencia == null)
+                return NotFound();
+
+            incidencia.Estado = "Cerrada";
+
+            await _context.SaveChangesAsync();
+
+            TempData["Mensaje"] = "La incidencia fue cerrada correctamente.";
 
             return RedirectToAction(nameof(Incidencias));
         }
